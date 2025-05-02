@@ -90,9 +90,9 @@ function App() {
     setActiveRange(range); // Update the active range
   };
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) => {
     if (active && payload && payload.length) {
-      const date = new Date(label).toLocaleDateString("en-US", {
+      const date = new Date(label!).toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
         day: "numeric",
@@ -101,7 +101,7 @@ function App() {
       return (
         <div className="bg-white dark:bg-gray-800 text-black dark:text-white p-2 rounded shadow">
           <p className="font-bold">{date}</p>
-          {payload.map((entry, index) => (
+          {payload.map((entry: any, index: number) => (
             <p
               key={index}
               className="text-sm"
