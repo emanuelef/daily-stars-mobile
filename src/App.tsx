@@ -63,7 +63,7 @@ function App() {
           cumulative,
         }));
         setRawData(formattedData); // Store raw data
-        const smoothedData = calculateRunningAverage(formattedData, 10); // Apply a 7-day running average
+        const smoothedData = calculateRunningAverage(formattedData, 14); // Apply a 7-day running average
         setChartData(smoothedData);
         setFilteredData(smoothedData); // Initially show all data
       })
@@ -84,7 +84,7 @@ function App() {
         ? filtered // No smoothing for "Last 7 Days" when viewing "Daily"
         : days <= 7
           ? filtered // No smoothing for very short ranges
-          : calculateRunningAverage(filtered, days <= 30 ? 3 : 10); // Use smaller window for 30 days, larger for all time
+          : calculateRunningAverage(filtered, days <= 30 ? 3 : 14); // Use smaller window for 30 days, larger for all time
 
     setFilteredData(smoothedFilteredData);
     setActiveRange(range); // Update the active range
