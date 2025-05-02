@@ -11,9 +11,6 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 
-// Global variable for the repository
-const REPO_NAME = "helm/helm";
-
 // Function to calculate a running average
 function calculateRunningAverage(data: { date: string; daily: number; cumulative: number }[], windowSize: number) {
   return data.map((_, index, array) => {
