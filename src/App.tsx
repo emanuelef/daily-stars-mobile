@@ -8,9 +8,7 @@ import { parse } from "date-fns";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 
 // Global variable for the repository
