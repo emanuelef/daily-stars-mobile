@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, Tooltip } from "recharts";
+import { ResponsiveContainer } from "recharts";
+
 
 import {
   Card,
@@ -42,41 +44,40 @@ function App() {
         </div>
       </CardHeader>
       <CardContent className="px-2 sm:p-6">
-        <div className="aspect-auto h-[250px] w-full">
-          <LineChart
-            width={800}
-            height={400}
-            data={chartData}
-            margin={{
-              top: 20,
-              right: 30,
-              left: 20,
-              bottom: 5,
-            }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              tickFormatter={(value) => {
-                const date = new Date(value);
-                return date.toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                });
+        <div className="h-[250px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={chartData}
+              margin={{
+                top: 20,
+                right: 30,
+                left: 20,
+                bottom: 5,
               }}
-            />
-            <YAxis />
-            <Tooltip />
-            <Line
-              type="monotone"
-              dataKey="daily"
-              stroke="#8884d8"
-              strokeWidth={2}
-              dot={false}
-              name="Daily Stars"
-              isAnimationActive={false}
-            />
-            <Line
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(value) => {
+                  const date = new Date(value);
+                  return date.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  });
+                }}
+              />
+              <YAxis />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="daily"
+                stroke="#8884d8"
+                strokeWidth={2}
+                dot={false}
+                name="Daily Stars"
+                isAnimationActive={false}
+              />
+              {/* <Line
               type="monotone"
               dataKey="cumulative"
               stroke="#82ca9d"
@@ -84,8 +85,9 @@ function App() {
               dot={false}
               name="Cumulative Stars"
               isAnimationActive={false}
-            />
-          </LineChart>
+            /> */}
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </CardContent>
     </Card>
