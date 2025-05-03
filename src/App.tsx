@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRef } from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, Tooltip } from "recharts";
 import { ResponsiveContainer } from "recharts";
 import { parse, format } from "date-fns";
@@ -10,6 +11,7 @@ import {
   CardContent,
   CardHeader,
 } from "@/components/ui/card";
+
 
 const HOST = import.meta.env.VITE_HOST;
 
@@ -73,6 +75,7 @@ function App() {
   const [activeRange, setActiveRange] = React.useState<"7" | "30" | "all">("all");
   const [repoName, setRepoName] = React.useState("helm/helm"); // Default repository name
   const [inputRepoName, setInputRepoName] = React.useState(repoName); // Controlled input state
+  const currentSSE = useRef<EventSource | null>(null);
 
   // Apply dark mode on initial load
   React.useEffect(() => {
@@ -82,6 +85,50 @@ function App() {
       document.documentElement.classList.remove("dark");
     }
   }, [isDarkMode]);
+
+  const closeSSE = () => {
+    if (currentSSE.current) {
+      console.log("STOP SSE");
+      currentSSE.current.close();
+    }
+  };
+
+  const startSSEUpates = (repo: string, callsNeeded: number, onGoing: boolean) => {
+    console.log(repo, callsNeeded, onGoing);
+    const sse = new EventSource(`${HOST}/sse?repo=${repo}`);
+    closeSSE();
+    currentSSE.current = sse;
+
+    sse.onerror = (err) => {
+      console.log("on error", err);
+    };
+
+    // The onmessage handler is called if no event name is specified for a message.
+    sse.onmessage = (msg) => {
+      console.log("on message", msg);
+    };
+
+    sse.onopen = (...args) => {
+      console.log("on open", args);
+    };
+
+    sse.addEventListener("current-value", (event) => {
+      const parsedData = JSON.parse(event.data);
+      const currentValue = parsedData.data;
+      // setProgressValue(currentValue);
+
+      console.log("currentValue", currentValue, callsNeeded);
+
+      if (currentValue === callsNeeded) {
+        console.log("CLOSE SSE");
+        closeSSE();
+        setTimeout(() => {
+          // fetchAllStars(repo, true);
+        }, 1600);
+        // setLoading(false);
+      }
+    });
+  };
 
   const fetchStatus = async (repo: string) => {
     try {
@@ -120,6 +167,9 @@ function App() {
       const status = await fetchStatus(repoName); // Fetch status
       console.log(status);
 
+      const callsNeeded = Math.floor(data.stars / 100);
+      startSSEUpates(repoName, callsNeeded, status.onGoing);
+
       // Remove the last day if it is the current day
       const today = new Date().toISOString().split("T")[0];
       if (starHistory.length > 0 && starHistory[starHistory.length - 1].date.startsWith(today)) {
@@ -153,7 +203,7 @@ function App() {
   }, [fetchStarsHistory]);
 
   // Filter data based on the selected range and apply adaptive smoothing
-  const filterData = (days: number, range: "7" | "30" | "all") => {
+  const filterData = (days: number, range: "30" | "all") => {
     const now = new Date();
     const dataToFilter = rawData; // Use rawData for all ranges to ensure real values are available
     const filtered = dataToFilter.filter((item) => {
@@ -165,9 +215,7 @@ function App() {
     const smoothedFilteredData =
       range === "30"
         ? filtered // Use real values for "Last 30 Days"
-        : days === 7 && activeChart === "daily"
-          ? filtered
-          : calculateRunningAverage(filtered, days <= 30 ? 3 : 14);
+        : calculateRunningAverage(filtered, 14);
 
     setFilteredData(smoothedFilteredData);
     setActiveRange(range);
@@ -249,12 +297,6 @@ function App() {
             </div>
           </div>
           <div className="flex gap-2 px-6 py-5 sm:py-6">
-            <button
-              className={`px-4 py-2 rounded-md ${activeRange === "7" ? "bg-blue-500 text-white" : "bg-gray-200 dark:bg-gray-700"}`}
-              onClick={() => filterData(7, "7")}
-            >
-              Last 7 Days
-            </button>
             <button
               className={`px-4 py-2 rounded-md ${activeRange === "30" ? "bg-blue-500 text-white" : "bg-gray-200 dark:bg-gray-700"}`}
               onClick={() => filterData(30, "30")}
