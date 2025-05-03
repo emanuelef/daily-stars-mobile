@@ -11,6 +11,8 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 
+const HOST = import.meta.env.VITE_HOST;
+
 // Function to calculate a running average
 function calculateRunningAverage(data: { date: string; daily: number; cumulative: number }[], windowSize: number) {
   return data.map((_, index, array) => {
@@ -81,44 +83,69 @@ function App() {
     }
   }, [isDarkMode]);
 
+  const fetchStatus = async (repo: string) => {
+    try {
+      const response = await fetch(`${HOST}/status?repo=${repo}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`An error occurred: ${error}`);
+    }
+  };
+
   // Fetch data from the API
-  const fetchStarsHistory = React.useCallback(() => {
-    fetch(`https://emafuma.mywire.org:8090/allStars?repo=${repoName}`)
-      .then((response) => response.json())
-      .then((data) => {
-        let starHistory = data.stars.map(
-          ([date, daily, cumulative]: [string, number, number]) => ({
-            date: format(parse(date, "dd-MM-yyyy", new Date()), "yyyy-MM-dd"), // Fixed date parsing
-            daily,
-            cumulative,
-          })
-        );
+  const fetchStarsHistory = React.useCallback(async () => {
+    try {
+      const response = await fetch(`${HOST}/allStars?repo=${repoName}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
 
-        // Remove the last day if it is the current day
-        const today = new Date().toISOString().split("T")[0];
-        if (starHistory.length > 0 && starHistory[starHistory.length - 1].date.startsWith(today)) {
-          console.log("Removing current day's data:", starHistory[starHistory.length - 1]);
-          starHistory.pop(); // Remove the last element
-        }
+      const data = await response.json();
 
-        // Calculate percentiles to detect spikes
-        const dailyValues = starHistory
-          .map((entry: { daily: number }) => entry.daily)
-          .filter((value: number) => value > 0);
-        const res = calculatePercentiles(dailyValues, 0.5, 0.98);
+      console.log("Fetched data:", data);
 
-        // Remove spike on the first day if it exceeds the 98th percentile
-        if (starHistory.length > 2 && starHistory[0].daily >= res[1]) {
-          console.log("Removing spike on first day:", starHistory[0]);
-          starHistory.shift(); // Remove the first element
-        }
+      let starHistory = data.stars.map(
+        ([date, daily, cumulative]: [string, number, number]) => ({
+          date: format(parse(date, "dd-MM-yyyy", new Date()), "yyyy-MM-dd"), // Fixed date parsing
+          daily,
+          cumulative,
+        })
+      );
 
-        setRawData(starHistory);
-        const smoothedData = calculateRunningAverage(starHistory, 14);
-        setChartData(smoothedData);
-        setFilteredData(smoothedData);
-      })
-      .catch((error) => console.error("Error fetching data:", error));
+      const status = await fetchStatus(repoName); // Fetch status
+      console.log(status);
+
+      // Remove the last day if it is the current day
+      const today = new Date().toISOString().split("T")[0];
+      if (starHistory.length > 0 && starHistory[starHistory.length - 1].date.startsWith(today)) {
+        console.log("Removing current day's data:", starHistory[starHistory.length - 1]);
+        starHistory.pop(); // Remove the last element
+      }
+
+      // Calculate percentiles to detect spikes
+      const dailyValues = starHistory
+        .map((entry: { daily: number }) => entry.daily)
+        .filter((value: number) => value > 0);
+      const res = calculatePercentiles(dailyValues, 0.5, 0.98);
+
+      // Remove spike on the first day if it exceeds the 98th percentile
+      if (starHistory.length > 2 && starHistory[0].daily >= res[1]) {
+        console.log("Removing spike on first day:", starHistory[0]);
+        starHistory.shift(); // Remove the first element
+      }
+
+      setRawData(starHistory);
+      const smoothedData = calculateRunningAverage(starHistory, 14);
+      setChartData(smoothedData);
+      setFilteredData(smoothedData);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
   }, [repoName]);
 
   React.useEffect(() => {
@@ -257,15 +284,15 @@ function App() {
             </button>
           </div>
         </CardHeader>
-        <CardContent className="px-2 sm:p-6">
+        <CardContent className="p-0"> {/* Remove padding */}
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={filteredData}
                 margin={{
                   top: 4,
-                  right: 4,
-                  left: 4,
+                  right: 14,
+                  left: 0, // Ensure left margin is 0
                   bottom: 4,
                 }}
               >
