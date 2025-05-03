@@ -105,16 +105,17 @@ function App() {
   // Filter data based on the selected range and apply adaptive smoothing
   const filterData = (days: number, range: "7" | "30" | "all") => {
     const now = new Date();
-    const dataToFilter = days === 7 && activeChart === "daily" ? rawData : chartData;
+    const dataToFilter = rawData; // Use rawData for all ranges to ensure real values are available
     const filtered = dataToFilter.filter((item) => {
       const itemDate = new Date(item.date);
       return now.getTime() - itemDate.getTime() <= days * 24 * 60 * 60 * 1000;
     });
 
+    // Skip smoothing for "Last 30 Days"
     const smoothedFilteredData =
-      days === 7 && activeChart === "daily"
-        ? filtered
-        : days <= 7
+      range === "30"
+        ? filtered // Use real values for "Last 30 Days"
+        : days === 7 && activeChart === "daily"
           ? filtered
           : calculateRunningAverage(filtered, days <= 30 ? 3 : 14);
 
