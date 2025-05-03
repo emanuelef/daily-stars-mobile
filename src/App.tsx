@@ -3,7 +3,7 @@
 import * as React from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, Tooltip } from "recharts";
 import { ResponsiveContainer } from "recharts";
-import { parse } from "date-fns";
+import { parse, format } from "date-fns";
 
 import {
   Card,
@@ -65,11 +65,18 @@ function App() {
       .then((data) => {
         let starHistory = data.stars.map(
           ([date, daily, cumulative]: [string, number, number]) => ({
-            date: parse(date, "dd-MM-yyyy", new Date()).toISOString(),
+            date: format(parse(date, "dd-MM-yyyy", new Date()), "yyyy-MM-dd"), // Fixed date parsing
             daily,
             cumulative,
           })
         );
+
+        // Remove the last day if it is the current day
+        const today = new Date().toISOString().split("T")[0];
+        if (starHistory.length > 0 && starHistory[starHistory.length - 1].date.startsWith(today)) {
+          console.log("Removing current day's data:", starHistory[starHistory.length - 1]);
+          starHistory.pop(); // Remove the last element
+        }
 
         // Calculate percentiles to detect spikes
         const dailyValues = starHistory
@@ -160,6 +167,13 @@ function App() {
                 type="text"
                 value={inputRepoName}
                 onChange={(e) => setInputRepoName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const cleanedRepoName = inputRepoName.replace(/\s+/g, ""); // Remove all spaces
+                    setRepoName(cleanedRepoName);
+                    fetchStarsHistory();
+                  }
+                }}
                 placeholder="owner/repo"
                 className="px-4 py-2 border rounded-md dark:bg-gray-800 dark:text-white"
               />
