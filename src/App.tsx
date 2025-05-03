@@ -63,14 +63,18 @@ function App() {
     fetch(`https://emafuma.mywire.org:8090/allStars?repo=${repoName}`)
       .then((response) => response.json())
       .then((data) => {
-        let starHistory = data.stars.map(([date, daily, cumulative]: [string, number, number]) => ({
-          date: parse(date, "dd-MM-yyyy", new Date()).toISOString(),
-          daily,
-          cumulative,
-        }));
+        let starHistory = data.stars.map(
+          ([date, daily, cumulative]: [string, number, number]) => ({
+            date: parse(date, "dd-MM-yyyy", new Date()).toISOString(),
+            daily,
+            cumulative,
+          })
+        );
 
         // Calculate percentiles to detect spikes
-        const dailyValues = starHistory.map((entry) => entry.daily).filter((value) => value > 0);
+        const dailyValues = starHistory
+          .map((entry: { daily: number }) => entry.daily)
+          .filter((value: number) => value > 0);
         const res = calculatePercentiles(dailyValues, 0.5, 0.98);
 
         // Remove spike on the first day if it exceeds the 98th percentile
