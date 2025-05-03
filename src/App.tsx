@@ -33,6 +33,29 @@ function calculatePercentiles(data: number[], ...percentiles: number[]) {
   });
 }
 
+const stripTrailingSlash = (str: string) =>
+  str.charAt(str.length - 1) === "/" ? str.substr(0, str.length - 1) : str;
+
+const parseGitHubRepoURL = (url: string) => {
+  url = url.replace(/ /g, "");
+  url = url.toLowerCase();
+  url = stripTrailingSlash(url);
+  // Define the regular expression pattern to match GitHub repository URLs
+  const repoURLPattern =
+    /^(?:https?:\/\/github\.com\/)?(?:\/)?([^/]+)\/([^/]+)(?:\/.*)?$/;
+
+  // Use RegExp.exec to match the pattern against the URL
+  const match = repoURLPattern.exec(url);
+
+  if (match && match.length === 3) {
+    const owner = match[1];
+    const repoName = match[2];
+    return `${owner}/${repoName}`;
+  } else {
+    return null; // Invalid URL
+  }
+};
+
 function App() {
   const [chartData, setChartData] = React.useState<
     { date: string; daily: number; cumulative: number }[]
@@ -170,20 +193,28 @@ function App() {
                 onChange={(e) => setInputRepoName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    const cleanedRepoName = inputRepoName.replace(/\s+/g, ""); // Remove all spaces
-                    setRepoName(cleanedRepoName);
-                    fetchStarsHistory();
+                    const parsedRepoName = parseGitHubRepoURL(inputRepoName); // Parse the input
+                    if (parsedRepoName) {
+                      setRepoName(parsedRepoName);
+                      fetchStarsHistory();
+                    } else {
+                      console.error("Invalid GitHub repository URL");
+                    }
                   }
                 }}
-                placeholder="owner/repo"
-                className="px-4 py-2 border rounded-md dark:bg-gray-800 dark:text-white"
+                placeholder="owner/repo or GitHub URL"
+                className="px-4 py-2 border rounded-md dark:bg-gray-800 dark:text-white w-96"
               />
               <button
                 className="px-4 py-2 bg-blue-500 text-white rounded-md"
                 onClick={() => {
-                  const cleanedRepoName = inputRepoName.replace(/\s+/g, ""); // Remove all spaces
-                  setRepoName(cleanedRepoName);
-                  fetchStarsHistory();
+                  const parsedRepoName = parseGitHubRepoURL(inputRepoName); // Parse the input
+                  if (parsedRepoName) {
+                    setRepoName(parsedRepoName);
+                    fetchStarsHistory();
+                  } else {
+                    console.error("Invalid GitHub repository URL");
+                  }
                 }}
               >
                 Fetch Stars
