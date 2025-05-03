@@ -24,6 +24,15 @@ function calculateRunningAverage(data: { date: string; daily: number; cumulative
   });
 }
 
+// Function to calculate percentiles
+function calculatePercentiles(data: number[], ...percentiles: number[]) {
+  const sorted = [...data].sort((a, b) => a - b);
+  return percentiles.map((percentile) => {
+    const index = Math.ceil(percentile * sorted.length) - 1;
+    return sorted[index];
+  });
+}
+
 function App() {
   const [chartData, setChartData] = React.useState<
     { date: string; daily: number; cumulative: number }[]
@@ -54,13 +63,24 @@ function App() {
     fetch(`https://emafuma.mywire.org:8090/allStars?repo=${repoName}`)
       .then((response) => response.json())
       .then((data) => {
-        const formattedData = data.stars.map(([date, daily, cumulative]: [string, number, number]) => ({
+        let starHistory = data.stars.map(([date, daily, cumulative]: [string, number, number]) => ({
           date: parse(date, "dd-MM-yyyy", new Date()).toISOString(),
           daily,
           cumulative,
         }));
-        setRawData(formattedData);
-        const smoothedData = calculateRunningAverage(formattedData, 14);
+
+        // Calculate percentiles to detect spikes
+        const dailyValues = starHistory.map((entry) => entry.daily).filter((value) => value > 0);
+        const res = calculatePercentiles(dailyValues, 0.5, 0.98);
+
+        // Remove spike on the first day if it exceeds the 98th percentile
+        if (starHistory.length > 2 && starHistory[0].daily >= res[1]) {
+          console.log("Removing spike on first day:", starHistory[0]);
+          starHistory.shift(); // Remove the first element
+        }
+
+        setRawData(starHistory);
+        const smoothedData = calculateRunningAverage(starHistory, 14);
         setChartData(smoothedData);
         setFilteredData(smoothedData);
       })
@@ -142,7 +162,8 @@ function App() {
               <button
                 className="px-4 py-2 bg-blue-500 text-white rounded-md"
                 onClick={() => {
-                  setRepoName(inputRepoName);
+                  const cleanedRepoName = inputRepoName.replace(/\s+/g, ""); // Remove all spaces
+                  setRepoName(cleanedRepoName);
                   fetchStarsHistory();
                 }}
               >
