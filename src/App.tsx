@@ -274,7 +274,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 text-black dark:text-white">
+    <div className="min-h-screen bg-white dark:bg-gray-900 text-black dark:text-white overflow-x-hidden">
       <div className="flex justify-end p-4">
         <button
           className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md mr-2"
