@@ -21,6 +21,18 @@ import {
 
 const HOST = import.meta.env.VITE_HOST;
 
+const ProgressBar = ({ value, max }: { value: number; max: number }) => {
+  const percentage = (value / max) * 100;
+
+  return (
+    <div className="w-full bg-gray-200 rounded-full h-4 dark:bg-gray-700">
+      <div
+        className="bg-blue-500 h-4 rounded-full"
+        style={{ width: `${percentage}%` }}
+      ></div>
+    </div>
+  );
+};
 
 function App() {
   const [chartData, setChartData] = React.useState<
@@ -37,6 +49,9 @@ function App() {
   const [activeRange, setActiveRange] = React.useState<"30" | "all">("all");
   const [repoName, setRepoName] = React.useState("helm/helm"); // Default repository name
   const [inputRepoName, setInputRepoName] = React.useState(repoName); // Controlled input state
+  const [progressValue, setProgressValue] = React.useState(0); // Current progress
+  const [maxProgress, setMaxProgress] = React.useState(100); // Maximum progress
+  const [isFetching, setIsFetching] = React.useState(false); // Fetching state
   const currentSSE = useRef<EventSource | null>(null);
 
   // Apply dark mode on initial load
@@ -61,11 +76,13 @@ function App() {
     closeSSE();
     currentSSE.current = sse;
 
+    setIsFetching(true); // Set fetching state to true
+    setMaxProgress(callsNeeded); // Set the maximum progress
+
     sse.onerror = (err) => {
       console.log("on error", err);
     };
 
-    // The onmessage handler is called if no event name is specified for a message.
     sse.onmessage = (msg) => {
       console.log("on message", msg);
     };
@@ -77,7 +94,7 @@ function App() {
     sse.addEventListener("current-value", (event) => {
       const parsedData = JSON.parse(event.data);
       const currentValue = parsedData.data;
-      // setProgressValue(currentValue);
+      setProgressValue(currentValue); // Update progress value
 
       console.log("currentValue", currentValue, callsNeeded);
 
@@ -87,7 +104,7 @@ function App() {
         setTimeout(() => {
           fetchAllStars(repo);
         }, 1600);
-        // setLoading(false);
+        setIsFetching(false); // Set fetching state to false
       }
     });
   };
@@ -338,6 +355,14 @@ function App() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {isFetching && (
+            <div className="px-6 py-4">
+              <ProgressBar value={progressValue} max={maxProgress} />
+              <p className="text-sm text-gray-500 mt-2">
+                {progressValue} / {maxProgress} requests fetched
+              </p>
+            </div>
+          )}
           <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
