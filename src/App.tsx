@@ -285,7 +285,7 @@ function App() {
       </div>
       <Card>
         <CardHeader className="flex flex-col items-stretch space-y-0 border-b p-0 sm:flex-row">
-          <div className="flex flex-1 flex-col justify-center gap-1 px-6 py-5 sm:py-6">
+          <div className="flex flex-1 flex-col justify-center gap-1 px-4 py-1 sm:py-2"> {/* Reduced padding */}
             <div className="flex items-center gap-2">
               <div className="relative w-96">
                 <input
@@ -329,16 +329,16 @@ function App() {
                   }
                 }}
               >
-                Fetch Stars
+                Fetch
               </button>
             </div>
           </div>
-          <div className="flex gap-2 px-6 py-5 sm:py-6">
+          <div className="flex gap-2 px-4 py-1 sm:py-2"> {/* Reduced padding */}
             <button
               className={`px-4 py-2 rounded-md ${activeRange === "30" ? "bg-blue-500 text-white" : "bg-gray-200 dark:bg-gray-700"}`}
               onClick={() => filterData(30, "30")}
             >
-              Last 30 Days
+              30 Days
             </button>
             <button
               className={`px-4 py-2 rounded-md ${activeRange === "all" ? "bg-blue-500 text-white" : "bg-gray-200 dark:bg-gray-700"}`}
@@ -347,7 +347,7 @@ function App() {
                 setActiveRange("all");
               }}
             >
-              All Time
+              All
             </button>
             <button
               className={`px-4 py-2 rounded-md ${activeChart === "daily" ? "bg-green-500 text-white" : "bg-gray-200 dark:bg-gray-700"}`}
@@ -364,15 +364,15 @@ function App() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="h-[300px] w-full">
+          <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={filteredData}
                 margin={{
-                  top: 4,
+                  top: 0, // No extra margin at the top
                   right: 14,
                   left: 0,
-                  bottom: 20, // Add space for the Brush
+                  bottom: 20,
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="gray" />
@@ -418,7 +418,6 @@ function App() {
                   name={activeChart === "daily" ? "Daily Stars" : "Cumulative Stars"}
                   isAnimationActive={false}
                 />
-                {/* Add the Brush component */}
                 <Brush
                   dataKey="date"
                   height={30}
