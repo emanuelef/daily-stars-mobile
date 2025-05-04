@@ -72,7 +72,7 @@ function App() {
   >([]);
   const [isDarkMode, setIsDarkMode] = React.useState(true);
   const [activeChart, setActiveChart] = React.useState<"daily" | "cumulative">("daily");
-  const [activeRange, setActiveRange] = React.useState<"7" | "30" | "all">("all");
+  const [activeRange, setActiveRange] = React.useState<"30" | "all">("all");
   const [repoName, setRepoName] = React.useState("helm/helm"); // Default repository name
   const [inputRepoName, setInputRepoName] = React.useState(repoName); // Controlled input state
   const currentSSE = useRef<EventSource | null>(null);
@@ -93,7 +93,7 @@ function App() {
     }
   };
 
-  const startSSEUpates = (repo: string, callsNeeded: number, onGoing: boolean) => {
+  const startSSEUpdates = (repo: string, callsNeeded: number, onGoing: boolean) => {
     console.log(repo, callsNeeded, onGoing);
     const sse = new EventSource(`${HOST}/sse?repo=${repo}`);
     closeSSE();
@@ -130,6 +130,25 @@ function App() {
     });
   };
 
+  const fetchTotalStars = async (repo: string) => {
+    try {
+      const response = await fetch(`${HOST}/totalStars?repo=${repo}`);
+
+      if (!response.ok) {
+        /*         setLoading(false);
+                toast.error("Internal Server Error. Please try again later.", {
+                  position: toast.POSITION.BOTTOM_CENTER,
+                }); */
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`An error occurred: ${error}`);
+      //setLoading(false);
+    }
+  };
+
   const fetchStatus = async (repo: string) => {
     try {
       const response = await fetch(`${HOST}/status?repo=${repo}`);
@@ -147,52 +166,58 @@ function App() {
   // Fetch data from the API
   const fetchStarsHistory = React.useCallback(async () => {
     try {
-      const response = await fetch(`${HOST}/allStars?repo=${repoName}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      console.log("Fetched data:", data);
-
-      let starHistory = data.stars.map(
-        ([date, daily, cumulative]: [string, number, number]) => ({
-          date: format(parse(date, "dd-MM-yyyy", new Date()), "yyyy-MM-dd"), // Fixed date parsing
-          daily,
-          cumulative,
-        })
-      );
+      const totalStars = await fetchTotalStars(repoName);
 
       const status = await fetchStatus(repoName); // Fetch status
       console.log(status);
 
-      const callsNeeded = Math.floor(data.stars / 100);
-      startSSEUpates(repoName, callsNeeded, status.onGoing);
+      if (!status.onGoing) {
+        //fetchAllStars(repoParsed);
+        const response = await fetch(`${HOST}/allStars?repo=${repoName}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
 
-      // Remove the last day if it is the current day
-      const today = new Date().toISOString().split("T")[0];
-      if (starHistory.length > 0 && starHistory[starHistory.length - 1].date.startsWith(today)) {
-        console.log("Removing current day's data:", starHistory[starHistory.length - 1]);
-        starHistory.pop(); // Remove the last element
+        const data = await response.json();
+
+        console.log("Fetched data:", data);
+
+        let starHistory = data.stars.map(
+          ([date, daily, cumulative]: [string, number, number]) => ({
+            date: format(parse(date, "dd-MM-yyyy", new Date()), "yyyy-MM-dd"), // Fixed date parsing
+            daily,
+            cumulative,
+          })
+        );
+
+        // Remove the last day if it is the current day
+        const today = new Date().toISOString().split("T")[0];
+        if (starHistory.length > 0 && starHistory[starHistory.length - 1].date.startsWith(today)) {
+          console.log("Removing current day's data:", starHistory[starHistory.length - 1]);
+          starHistory.pop(); // Remove the last element
+        }
+
+        // Calculate percentiles to detect spikes
+        const dailyValues = starHistory
+          .map((entry: { daily: number }) => entry.daily)
+          .filter((value: number) => value > 0);
+        const res = calculatePercentiles(dailyValues, 0.5, 0.98);
+
+        // Remove spike on the first day if it exceeds the 98th percentile
+        if (starHistory.length > 2 && starHistory[0].daily >= res[1]) {
+          console.log("Removing spike on first day:", starHistory[0]);
+          starHistory.shift(); // Remove the first element
+        }
+
+        setRawData(starHistory);
+        const smoothedData = calculateRunningAverage(starHistory, 14);
+        setChartData(smoothedData);
+        setFilteredData(smoothedData);
       }
 
-      // Calculate percentiles to detect spikes
-      const dailyValues = starHistory
-        .map((entry: { daily: number }) => entry.daily)
-        .filter((value: number) => value > 0);
-      const res = calculatePercentiles(dailyValues, 0.5, 0.98);
-
-      // Remove spike on the first day if it exceeds the 98th percentile
-      if (starHistory.length > 2 && starHistory[0].daily >= res[1]) {
-        console.log("Removing spike on first day:", starHistory[0]);
-        starHistory.shift(); // Remove the first element
-      }
-
-      setRawData(starHistory);
-      const smoothedData = calculateRunningAverage(starHistory, 14);
-      setChartData(smoothedData);
-      setFilteredData(smoothedData);
+      const callsNeeded = Math.floor(totalStars.stars / 100);
+      console.log(repoName, callsNeeded, status.onGoing);
+      startSSEUpdates(repoName, callsNeeded, status.onGoing);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -262,24 +287,36 @@ function App() {
         <CardHeader className="flex flex-col items-stretch space-y-0 border-b p-0 sm:flex-row">
           <div className="flex flex-1 flex-col justify-center gap-1 px-6 py-5 sm:py-6">
             <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={inputRepoName}
-                onChange={(e) => setInputRepoName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const parsedRepoName = parseGitHubRepoURL(inputRepoName); // Parse the input
-                    if (parsedRepoName) {
-                      setRepoName(parsedRepoName);
-                      fetchStarsHistory();
-                    } else {
-                      console.error("Invalid GitHub repository URL");
+              <div className="relative w-96">
+                <input
+                  type="text"
+                  value={inputRepoName}
+                  onChange={(e) => setInputRepoName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const parsedRepoName = parseGitHubRepoURL(inputRepoName); // Parse the input
+                      if (parsedRepoName) {
+                        setRepoName(parsedRepoName);
+                        fetchStarsHistory();
+                      } else {
+                        console.error("Invalid GitHub repository URL");
+                      }
                     }
-                  }
-                }}
-                placeholder="owner/repo or GitHub URL"
-                className="px-4 py-2 border rounded-md dark:bg-gray-800 dark:text-white w-96"
-              />
+                  }}
+                  placeholder="owner/repo or GitHub URL"
+                  className="px-4 py-2 border rounded-md dark:bg-gray-800 dark:text-white w-full"
+                />
+                <button
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gray-300 text-gray-600 rounded-full p-1 hover:bg-gray-400"
+                  onClick={() => {
+                    setInputRepoName(""); // Clear the input text
+                    closeSSE(); // Cancel all ongoing SSE connections
+                    console.log("All SSE connections canceled");
+                  }}
+                >
+                  ✖
+                </button>
+              </div>
               <button
                 className="px-4 py-2 bg-blue-500 text-white rounded-md"
                 onClick={() => {
@@ -373,7 +410,7 @@ function App() {
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Line
-                  type={activeRange === "7" || activeRange === "30" ? "linear" : "monotone"}
+                  type={activeRange === "30" ? "linear" : "monotone"}
                   dataKey={activeChart}
                   stroke={activeChart === "daily" ? "#8884d8" : "#82ca9d"}
                   strokeWidth={2}
