@@ -85,7 +85,7 @@ function App() {
         console.log("CLOSE SSE");
         closeSSE();
         setTimeout(() => {
-          // fetchAllStars(repo, true);
+          fetchAllStars(repo);
         }, 1600);
         // setLoading(false);
       }
@@ -95,6 +95,8 @@ function App() {
   const fetchTotalStars = async (repo: string) => {
     try {
       const response = await fetch(`${HOST}/totalStars?repo=${repo}`);
+
+      console.log("fetchTotalStars", response);
 
       if (!response.ok) {
         /*         setLoading(false);
@@ -109,6 +111,50 @@ function App() {
       console.error(`An error occurred: ${error}`);
       //setLoading(false);
     }
+  };
+
+  const fetchAllStars = async (repo: string) => {
+    const response = await fetch(`${HOST}/allStars?repo=${repo}`);
+    if (!response.ok) {
+      //throw new Error(`HTTP error! Status: ${response.status}`);
+      return;
+    }
+
+    const data = await response.json();
+
+    console.log("Fetched data:", data);
+
+    let starHistory = data.stars.map(
+      ([date, daily, cumulative]: [string, number, number]) => ({
+        date: format(parse(date, "dd-MM-yyyy", new Date()), "yyyy-MM-dd"), // Fixed date parsing
+        daily,
+        cumulative,
+      })
+    );
+
+    // Remove the last day if it is the current day
+    const today = new Date().toISOString().split("T")[0];
+    if (starHistory.length > 0 && starHistory[starHistory.length - 1].date.startsWith(today)) {
+      console.log("Removing current day's data:", starHistory[starHistory.length - 1]);
+      starHistory.pop(); // Remove the last element
+    }
+
+    // Calculate percentiles to detect spikes
+    const dailyValues = starHistory
+      .map((entry: { daily: number }) => entry.daily)
+      .filter((value: number) => value > 0);
+    const res = calculatePercentiles(dailyValues, 0.5, 0.98);
+
+    // Remove spike on the first day if it exceeds the 98th percentile
+    if (starHistory.length > 2 && starHistory[0].daily >= res[1]) {
+      console.log("Removing spike on first day:", starHistory[0]);
+      starHistory.shift(); // Remove the first element
+    }
+
+    setRawData(starHistory);
+    const smoothedData = calculateRunningAverage(starHistory, 14);
+    setChartData(smoothedData);
+    setFilteredData(smoothedData);
   };
 
   const fetchStatus = async (repo: string) => {
@@ -126,68 +172,35 @@ function App() {
   };
 
   // Fetch data from the API
-  const fetchStarsHistory = React.useCallback(async () => {
-    try {
-      const totalStars = await fetchTotalStars(repoName);
+  const fetchStarsHistory = React.useCallback(
+    async (repo?: string) => {
+      const targetRepo = repo || repoName; // Use the passed repo or fallback to state
+      try {
+        const totalStars = await fetchTotalStars(targetRepo);
 
-      const status = await fetchStatus(repoName); // Fetch status
-      console.log(status);
+        const status = await fetchStatus(targetRepo); // Fetch status
+        console.log(status);
 
-      if (!status.onGoing) {
-        //fetchAllStars(repoParsed);
-        const response = await fetch(`${HOST}/allStars?repo=${repoName}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
+        if (!status.onGoing) {
+          fetchAllStars(targetRepo); // Fetch all stars if not ongoing
         }
 
-        const data = await response.json();
-
-        console.log("Fetched data:", data);
-
-        let starHistory = data.stars.map(
-          ([date, daily, cumulative]: [string, number, number]) => ({
-            date: format(parse(date, "dd-MM-yyyy", new Date()), "yyyy-MM-dd"), // Fixed date parsing
-            daily,
-            cumulative,
-          })
-        );
-
-        // Remove the last day if it is the current day
-        const today = new Date().toISOString().split("T")[0];
-        if (starHistory.length > 0 && starHistory[starHistory.length - 1].date.startsWith(today)) {
-          console.log("Removing current day's data:", starHistory[starHistory.length - 1]);
-          starHistory.pop(); // Remove the last element
+        if (!status.cached) {
+          const callsNeeded = Math.floor(totalStars.stars / 100);
+          console.log(targetRepo, callsNeeded, status.onGoing);
+          startSSEUpdates(targetRepo, callsNeeded, status.onGoing);
         }
-
-        // Calculate percentiles to detect spikes
-        const dailyValues = starHistory
-          .map((entry: { daily: number }) => entry.daily)
-          .filter((value: number) => value > 0);
-        const res = calculatePercentiles(dailyValues, 0.5, 0.98);
-
-        // Remove spike on the first day if it exceeds the 98th percentile
-        if (starHistory.length > 2 && starHistory[0].daily >= res[1]) {
-          console.log("Removing spike on first day:", starHistory[0]);
-          starHistory.shift(); // Remove the first element
-        }
-
-        setRawData(starHistory);
-        const smoothedData = calculateRunningAverage(starHistory, 14);
-        setChartData(smoothedData);
-        setFilteredData(smoothedData);
+      } catch (error) {
+        console.error("Error fetching data:", error);
       }
-
-      const callsNeeded = Math.floor(totalStars.stars / 100);
-      console.log(repoName, callsNeeded, status.onGoing);
-      startSSEUpdates(repoName, callsNeeded, status.onGoing);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    }
-  }, [repoName]);
+    },
+    [repoName]
+  );
 
   React.useEffect(() => {
-    fetchStarsHistory();
-  }, [fetchStarsHistory]);
+    fetchStarsHistory(repoName); // Fetch the default repository on page load
+  }, []); // Empty dependency array ensures this runs only once
+
 
   // Filter data based on the selected range and apply adaptive smoothing
   const filterData = (days: number, range: "30" | "all") => {
@@ -258,8 +271,7 @@ function App() {
                     if (e.key === "Enter") {
                       const parsedRepoName = parseGitHubRepoURL(inputRepoName); // Parse the input
                       if (parsedRepoName) {
-                        setRepoName(parsedRepoName);
-                        fetchStarsHistory();
+                        setRepoName(parsedRepoName); // Update repoName, which triggers useEffect
                       } else {
                         console.error("Invalid GitHub repository URL");
                       }
@@ -284,8 +296,8 @@ function App() {
                 onClick={() => {
                   const parsedRepoName = parseGitHubRepoURL(inputRepoName); // Parse the input
                   if (parsedRepoName) {
-                    setRepoName(parsedRepoName);
-                    fetchStarsHistory();
+                    setRepoName(parsedRepoName); // Update repoName for consistency
+                    fetchStarsHistory(parsedRepoName); // Pass the parsedRepoName directly
                   } else {
                     console.error("Invalid GitHub repository URL");
                   }
