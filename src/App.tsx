@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRef } from "react";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis, Tooltip } from "recharts";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis, Tooltip, Brush } from "recharts";
 import { ResponsiveContainer } from "recharts";
 import { parse, format } from "date-fns";
 
@@ -363,16 +363,16 @@ function App() {
             </button>
           </div>
         </CardHeader>
-        <CardContent className="p-0"> {/* Remove padding */}
-          <div className="h-[250px] w-full">
+        <CardContent className="p-0">
+          <div className="h-[400px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={filteredData}
                 margin={{
                   top: 4,
                   right: 14,
-                  left: 0, // Ensure left margin is 0
-                  bottom: 4,
+                  left: 0,
+                  bottom: 20, // Add space for the Brush
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="gray" />
@@ -417,6 +417,15 @@ function App() {
                   dot={false}
                   name={activeChart === "daily" ? "Daily Stars" : "Cumulative Stars"}
                   isAnimationActive={false}
+                />
+                {/* Add the Brush component */}
+                <Brush
+                  dataKey="date"
+                  height={30}
+                  stroke="#8884d8"
+                  travellerWidth={10}
+                  startIndex={0}
+                  endIndex={filteredData.length - 1}
                 />
               </LineChart>
             </ResponsiveContainer>
