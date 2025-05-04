@@ -364,7 +364,7 @@ function App() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="h-[400px] w-full">
+          <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={filteredData}
