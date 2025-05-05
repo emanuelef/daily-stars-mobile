@@ -52,7 +52,12 @@ function App() {
   const [progressValue, setProgressValue] = React.useState(0); // Current progress
   const [maxProgress, setMaxProgress] = React.useState(100); // Maximum progress
   const [isFetching, setIsFetching] = React.useState(false); // Fetching state
+  const [eta, setEta] = React.useState<string | null>(null); // Estimated time of arrival
+  const lastUpdateTime = React.useRef<number | null>(null); // Timestamp of the last update
+  const lastProgressValue = React.useRef<number>(0); // Last progress value
   const currentSSE = useRef<EventSource | null>(null);
+  const speedHistory = useRef<number[]>([]); // Buffer to store recent speed values
+  const SPEED_HISTORY_LIMIT = 5; // Limit the buffer size to the last 5 updates
 
   // Apply dark mode on initial load
   React.useEffect(() => {
@@ -78,6 +83,9 @@ function App() {
 
     setIsFetching(true); // Set fetching state to true
     setMaxProgress(callsNeeded); // Set the maximum progress
+    lastUpdateTime.current = Date.now(); // Initialize the last update time
+    lastProgressValue.current = 0; // Reset the last progress value
+    speedHistory.current = []; // Clear the speed history buffer
 
     sse.onerror = (err) => {
       console.log("on error", err);
@@ -96,6 +104,48 @@ function App() {
       const currentValue = parsedData.data;
       setProgressValue(currentValue); // Update progress value
 
+      const now = Date.now();
+      if (lastUpdateTime.current) {
+        const timeElapsed = (now - lastUpdateTime.current) / 1000; // Time elapsed in seconds
+        const progressDelta = currentValue - lastProgressValue.current; // Progress made since last update
+        const speed = progressDelta / timeElapsed; // Speed in requests per second
+
+        // Add the speed to the history buffer if it's valid
+        if (speed > 0 && speed < 1000) { // Ignore unrealistic speeds
+          speedHistory.current.push(speed);
+          if (speedHistory.current.length > SPEED_HISTORY_LIMIT) {
+            speedHistory.current.shift(); // Remove the oldest speed if the buffer exceeds the limit
+          }
+
+          // Calculate the weighted average speed
+          const totalWeight = speedHistory.current.reduce((sum, _, index) => sum + (index + 1), 0);
+          const weightedSpeed =
+            speedHistory.current.reduce((sum, s, index) => sum + s * (index + 1), 0) / totalWeight;
+
+          // Calculate ETA using the weighted average speed
+          if (weightedSpeed > 0) {
+            const remainingRequests = callsNeeded - currentValue;
+
+            // Avoid recalculating ETA for very small remaining requests
+            if (remainingRequests > 1) {
+              const estimatedTime = remainingRequests / weightedSpeed; // Time in seconds
+
+              // Only update ETA if the change is significant
+              const minutes = Math.floor(estimatedTime / 60);
+              const seconds = Math.floor(estimatedTime % 60);
+              const newEta = `${minutes}m ${seconds}s`;
+
+              if (eta !== newEta) {
+                setEta(newEta); // Update ETA only if it has changed significantly
+              }
+            }
+          }
+        }
+      }
+
+      lastUpdateTime.current = now; // Update the last update time
+      lastProgressValue.current = currentValue; // Update the last progress value
+
       console.log("currentValue", currentValue, callsNeeded);
 
       if (currentValue === callsNeeded) {
@@ -105,6 +155,7 @@ function App() {
           fetchAllStars(repo);
         }, 1600);
         setIsFetching(false); // Set fetching state to false
+        setEta(null); // Clear ETA
       }
     });
   };
@@ -360,6 +411,7 @@ function App() {
               <ProgressBar value={progressValue} max={maxProgress} />
               <p className="text-sm text-gray-500 mt-2">
                 {progressValue} / {maxProgress} requests fetched
+                {eta ? <span className="ml-2">ETA: {eta}</span> : <span className="ml-2">Calculating...</span>}
               </p>
             </div>
           )}
