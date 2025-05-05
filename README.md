@@ -1,7 +1,7 @@
 # Daily Stars Tracker
 
 Daily Stars Tracker is a React + TypeScript application built with Vite. It allows users to track the daily and cumulative stars of GitHub repositories in real-time. The app features a responsive chart, real-time updates via Server-Sent Events (SSE), and a progress bar with an estimated time of arrival (ETA) for fetching data.  
-This is an attempt to (daily-stars-explorer)[make https://github.com/emanuelef/daily-stars-explorer] more mobile friendly.
+This is an attempt to make [daily-stars-explorer](https://github.com/emanuelef/daily-stars-explorer) more mobile friendly.
 
 <img width="1512" alt="Screenshot 2025-05-05 at 12 20 01" src="https://github.com/user-attachments/assets/d707ec55-94a1-4bd6-917f-bb3977fe8b7e" />
 
