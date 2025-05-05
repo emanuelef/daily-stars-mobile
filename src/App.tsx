@@ -5,6 +5,8 @@ import { useRef } from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, Tooltip, Brush } from "recharts";
 import { ResponsiveContainer } from "recharts";
 import { parse, format } from "date-fns";
+import CustomTooltip from "@/components/CustomTooltip";
+
 
 import {
   calculateRunningAverage,
@@ -17,22 +19,10 @@ import {
   CardContent,
   CardHeader,
 } from "@/components/ui/card";
+import { ProgressBar } from "./components/ProgressBar";
 
 
 const HOST = import.meta.env.VITE_HOST;
-
-const ProgressBar = ({ value, max }: { value: number; max: number }) => {
-  const percentage = (value / max) * 100;
-
-  return (
-    <div className="w-full bg-gray-200 rounded-full h-4 dark:bg-gray-700">
-      <div
-        className="bg-blue-500 h-4 rounded-full"
-        style={{ width: `${percentage}%` }}
-      ></div>
-    </div>
-  );
-};
 
 function App() {
   const [chartData, setChartData] = React.useState<
@@ -298,33 +288,6 @@ function App() {
 
     setFilteredData(smoothedFilteredData);
     setActiveRange(range);
-  };
-
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) => {
-    if (active && payload && payload.length) {
-      const date = new Date(label!).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-
-      return (
-        <div className="bg-white dark:bg-gray-800 text-black dark:text-white p-2 rounded shadow">
-          <p className="font-bold">{date}</p>
-          {payload.map((entry: any, index: number) => (
-            <p
-              key={index}
-              className="text-sm"
-              style={{ color: entry.stroke }}
-            >
-              {entry.name}: {Number.isInteger(entry.value) ? entry.value : entry.value.toFixed(1)}
-            </p>
-          ))}
-        </div>
-      );
-    }
-
-    return null;
   };
 
   return (
