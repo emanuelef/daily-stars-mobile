@@ -57,7 +57,13 @@ function App() {
   const lastProgressValue = React.useRef<number>(0); // Last progress value
   const currentSSE = useRef<EventSource | null>(null);
   const speedHistory = useRef<number[]>([]); // Buffer to store recent speed values
-  const SPEED_HISTORY_LIMIT = 5; // Limit the buffer size to the last 5 updates
+  const SPEED_HISTORY_LIMIT = 10; // Limit the buffer size to the last 5 updates
+
+  const ETA_UPDATE_INTERVAL = 5; // Recalculate ETA every 5 updates
+  const ETA_CHANGE_THRESHOLD = 5; // seconds
+  const etaUpdateCounter = useRef(0);
+  const previousEtaSeconds = useRef<number | null>(null);
+
 
   // Apply dark mode on initial load
   React.useEffect(() => {
@@ -117,26 +123,34 @@ function App() {
             speedHistory.current.shift(); // Remove the oldest speed if the buffer exceeds the limit
           }
 
-          // Calculate the weighted average speed
-          const totalWeight = speedHistory.current.reduce((sum, _, index) => sum + (index + 1), 0);
-          const weightedSpeed =
-            speedHistory.current.reduce((sum, s, index) => sum + s * (index + 1), 0) / totalWeight;
+          // Increment the update counter
+          etaUpdateCounter.current += 1;
 
-          // Calculate ETA using the weighted average speed
-          if (weightedSpeed > 0) {
-            const remainingRequests = callsNeeded - currentValue;
+          // Recalculate ETA only after the specified interval
+          if (etaUpdateCounter.current >= ETA_UPDATE_INTERVAL) {
+            etaUpdateCounter.current = 0; // Reset the counter
 
-            // Avoid recalculating ETA for very small remaining requests
-            if (remainingRequests > 1) {
-              const estimatedTime = remainingRequests / weightedSpeed; // Time in seconds
+            // Calculate the weighted average speed
+            const totalWeight = speedHistory.current.reduce((sum, _, index) => sum + (index + 1), 0);
+            const weightedSpeed =
+              speedHistory.current.reduce((sum, s, index) => sum + s * (index + 1), 0) / totalWeight;
 
-              // Only update ETA if the change is significant
-              const minutes = Math.floor(estimatedTime / 60);
-              const seconds = Math.floor(estimatedTime % 60);
-              const newEta = `${minutes}m ${seconds}s`;
+            // Calculate ETA using the weighted average speed
+            if (weightedSpeed > 0) {
+              const remainingRequests = callsNeeded - currentValue;
 
-              if (eta !== newEta) {
-                setEta(newEta); // Update ETA only if it has changed significantly
+              // Avoid recalculating ETA for very small remaining requests
+              if (remainingRequests > 1) {
+                const estimatedTimeSeconds = remainingRequests / weightedSpeed;
+
+                // Only update ETA if the change is significant
+                const diff = Math.abs((previousEtaSeconds.current ?? 0) - estimatedTimeSeconds);
+                if (previousEtaSeconds.current === null || diff > ETA_CHANGE_THRESHOLD) {
+                  previousEtaSeconds.current = estimatedTimeSeconds;
+                  const minutes = Math.floor(estimatedTimeSeconds / 60);
+                  const seconds = Math.floor(estimatedTimeSeconds % 60);
+                  setEta(`${minutes}m ${seconds}s`); // Update ETA
+                }
               }
             }
           }
@@ -146,14 +160,11 @@ function App() {
       lastUpdateTime.current = now; // Update the last update time
       lastProgressValue.current = currentValue; // Update the last progress value
 
-      console.log("currentValue", currentValue, callsNeeded);
-
+      // Close SSE when all requests are completed
       if (currentValue === callsNeeded) {
         console.log("CLOSE SSE");
         closeSSE();
-        setTimeout(() => {
-          fetchAllStars(repo);
-        }, 1600);
+        setTimeout(() => fetchAllStars(repo), 1600);
         setIsFetching(false); // Set fetching state to false
         setEta(null); // Clear ETA
       }
