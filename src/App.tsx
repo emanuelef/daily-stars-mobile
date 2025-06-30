@@ -267,9 +267,42 @@ function App() {
   );
 
   React.useEffect(() => {
-    fetchStarsHistory(repoName); // Fetch the default repository on page load
+    // Check if there's a repo in the URL hash
+    const repoFromHash = getRepoFromHash();
+    if (repoFromHash) {
+      setRepoName(repoFromHash);
+      setInputRepoName(repoFromHash);
+      fetchStarsHistory(repoFromHash);
+    } else {
+      fetchStarsHistory(repoName); // Fetch the default repository if no hash
+    }
+
+    // Listen for hash changes
+    const handleHashChange = () => {
+      const repo = getRepoFromHash();
+      if (repo) {
+        setRepoName(repo);
+        setInputRepoName(repo);
+        fetchStarsHistory(repo);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
   }, []); // Empty dependency array ensures this runs only once
 
+
+  // Function to parse repository from URL hash
+  const getRepoFromHash = () => {
+    const hash = window.location.hash; // e.g. "#/helm/helm"
+    const match = hash.match(/^#\/([^/]+)\/([^/]+)$/);
+    if (match) {
+      return `${match[1]}/${match[2]}`;
+    }
+    return null;
+  };
 
   // Filter data based on the selected range and apply adaptive smoothing
   const filterData = (days: number, range: "30" | "all") => {
